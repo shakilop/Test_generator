@@ -7,7 +7,11 @@ import os.path
 
 
 class Test_generator:
-
+    """
+    ERROR CODES:
+    -1 - Ошибка касаемо содержимого json файла
+    -2 - Ошибка открытия файла (не то расширение, или не сущ., или на входе не строка с адр/словарь с данными)
+    """
     class JSONFormatException(Exception):
         pass
 
@@ -15,20 +19,61 @@ class Test_generator:
         pass
 
     class Data_checker:
-        TYPE_WORD = "type"
-        CONNECTION_WORD = "connection"
-        VERSION_WORD = "version"
-        CONTENT_WORD = "contents"
-        NET_WORD = "net"
-        COMPONENT_WORD = "component"
-        PIN_WORD = "pin"
+        TYPE_WORD = None
+        CONNECTION_WORD = None
+        VERSION_WORD = None
+        CONTENT_WORD = None
+        NET_WORD = None
+        COMPONENT_WORD = None
+        PIN_WORD = None
+        data = None
 
-        def __init__(self, data=None):
+        def __init__(self, data=None,
+                     type_word="type",
+                     connection_word="connection",
+                     version_word="version",
+                     content_word="contents",
+                     net_word="net",
+                     component_word="component",
+                     pin_word="pin"):
+            """
+            JSON structure
+            {
+            "VERSION_WORD": 1.0,
+            "TYPE_WORD": "Plate",
+            "CONTENT_WORD": [
+            {
+                "NET_WORD": "ABC1",
+                "CONNECTION_WORD": [
+                    {
+                        "COMPONENT_WORD": "D1",
+                        "PIN_WORD": "6"
+                    },...
+                ]
+            },
+                ...
+            ]
+        {
+            :param data: json dict
+            """
             if data is None:
                 data = {}
             self.data = data
+            self.TYPE_WORD = type_word
+            self.CONNECTION_WORD = connection_word
+            self.VERSION_WORD = version_word
+            self.CONTENT_WORD = content_word
+            self.NET_WORD = net_word
+            self.COMPONENT_WORD = component_word
+            self.PIN_WORD = pin_word
 
         def __data_select(self, data=None):
+            """
+            data select (between init or method input)
+            :param data: json dict
+            :raise JSONFormatException (if data is not dict or None)
+            :return:
+            """
             if data is None:
                 return self.data
             elif type(data) is dict:
@@ -37,6 +82,11 @@ class Test_generator:
                 self.__gen_exception("Wrong datatype (data in check_version)")
 
         def check_version(self, data=None):
+            """
+            Check VERSION_WORD key in json dict
+            :param data: json data
+            :return: version value
+            """
             temp = self.__data_select(data)
             if self.VERSION_WORD in temp.keys():
                 return temp[self.VERSION_WORD]
@@ -44,6 +94,11 @@ class Test_generator:
                 self.__gen_exception("No \"" + self.VERSION_WORD + "\" field in json")
 
         def check_type(self, data=None):
+            """
+            Check TYPE_WORD key in JSON dict
+            :param data: json dict
+            :return: type_value
+            """
             temp = self.__data_select(data)
             if self.TYPE_WORD in temp.keys():
                 return temp[self.TYPE_WORD]
@@ -51,15 +106,34 @@ class Test_generator:
                 self.__gen_exception("No \"" + self.TYPE_WORD + "\" field in json")
 
         def __gen_exception(self, string):
+            """
+            raise JSONFormatException
+            :param string: msg
+            :raise JSONFormatException
+            """
             raise Test_generator.JSONFormatException(string)
 
-        def __check_word(self, word, dictionary=None):
+        def __check_word(self, key, dictionary=None):
+            """
+            check key in dictionary
+            if dictionary is not specified will take json dict (from init)
+            :return: dictionary[key]
+            :raise:JSONFormatException
+            """
             if dictionary is None:
-                dictionary = {}
-            if word not in dictionary.keys():
-                self.__gen_exception("No \"" + word + "\" field in json")
+                dictionary = self.data
+            if key not in dictionary.keys():
+                self.__gen_exception("No \"" + key + "\" field in json")
+            else:
+                return dictionary[key]
 
         def check_content(self, data=None):
+            """
+            check CONTENT_WORD key, and it's value of json dict
+            :param data: json dict
+            :return: no return value
+            :raise JSONFormatException
+            """
             temp = self.__data_select(data)
             if self.CONTENT_WORD in temp.keys():
                 # В листе как минимум 1 соеденение
@@ -94,7 +168,6 @@ class Test_generator:
     folder_flag = False
     error_code = 0
 
-    # TODO: Сделать error коды
     def __init__(self, plate, zhgut):
         # plate init
         self.plate_init(plate)
@@ -117,6 +190,8 @@ class Test_generator:
                 else:
                     raise self.FileTypeException("Plate: Wrong filetype(" + os.path.splitext(plate)[1] +
                                                  "). Must be .json")
+            else:
+                raise self.FileTypeException("Cannot find file/dir")
         else:
             raise self.FileTypeException("Garbage in plate input (not dict or str)")
 
@@ -131,11 +206,13 @@ class Test_generator:
                 else:
                     raise self.FileTypeException("Zhgut: Wrong filetype(" + os.path.splitext(zhgut)[1] +
                                                  "). Must be .json")
+            else:
+                raise self.FileTypeException("Cannot find file")
         else:
             raise self.FileTypeException("Garbage in zhgut input (not dict or str)")
 
     def check_data(self):
-        checker = self.Data_checker()
+        checker = self.Data_checker(self.plate_data)
         if not self.folder_flag:
             try:
                 checker.check_type(self.plate_data)
@@ -144,7 +221,6 @@ class Test_generator:
             except self.JSONFormatException as e:
                 print(e)
                 self.error_code = -1
-
 
 
 # Press the green button in the gutter to run the script.
