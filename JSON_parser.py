@@ -6,7 +6,7 @@ import json
 import os.path
 
 
-class Test_generator:
+class JSON_parser:
     """
     ERROR CODES:
     -1 - Ошибка касаемо содержимого json файла
@@ -175,50 +175,10 @@ class Test_generator:
 
     def __init__(self, plate, zhgut):
         # plate init
-        self.plate_init(plate)
-        self.zhgut_init(zhgut)
+        self.plate_data = plate
+        self.zhgut_data = zhgut
 
-    def plate_init(self, plate):
-        # На вход подали данные
-        if type(plate) == dict:
-            self.plate_data = plate
-        elif type(plate) == list:
-            self.plate_data = plate
-        # На вход подали адресс
-        elif type(plate) == str:
-            # string is directory
-            if os.path.isdir(plate):
-                self.folder_flag = True
-            # string is file (path)
-            elif os.path.isfile(plate):
-                if os.path.splitext(plate)[1] == ".json":
-                    with open(plate) as json_file:
-                        self.plate_data = json.load(json_file)
-                else:
-                    raise self.FileTypeException("Plate: Wrong filetype(" + os.path.splitext(plate)[1] +
-                                                 "). Must be .json")
-            else:
-                raise self.FileTypeException("Cannot find file/dir")
-        else:
-            raise self.FileTypeException("Garbage in plate input (not dict or str)")
-
-    def zhgut_init(self, zhgut):
-        if type(zhgut) == dict:
-            self.zhgut_data = zhgut
-        elif type(zhgut) == str:
-            if os.path.isfile(zhgut):
-                if os.path.splitext(zhgut)[1] == ".json":
-                    with open(zhgut) as zhgut_file:
-                        self.zhgut_data = json.load(zhgut_file)
-                else:
-                    raise self.FileTypeException("Zhgut: Wrong filetype(" + os.path.splitext(zhgut)[1] +
-                                                 "). Must be .json")
-            else:
-                raise self.FileTypeException("Cannot find file")
-        else:
-            raise self.FileTypeException("Garbage in zhgut input (not dict or str)")
-
-    def __check_dic(self,data=dict):
+    def __check_dic(self, data=dict):
         checker = self.Data_checker(data)
         try:
             checker.check()
@@ -228,68 +188,92 @@ class Test_generator:
             self.error_code = -1
             return False
 
-    def __check_address(self, address):
+    def __check_address(self, address, single=False):
+        """
+        Check address and files under it and return list with data from these file(s)
+        :param address: string with address of file or directory
+        :param single: bool (True - address of FILE, not DIR. False - maybe DIR)
+        :return: list of correct json dict
+        """
         res = []
         if type(address) == str:
-            if os.path.isdir(address):
+            if os.path.isdir(address) and not single:
                 for dr in os.listdir(address):
                     abs_path = os.path.join(address, dr)
                     if os.path.isfile(abs_path):
                         if os.path.splitext(abs_path)[1] == ".json":
                             with open(abs_path) as file:
-                                if not self.__check_dic(json.load(file)):
+                                temp = json.load(file)
+                                if not self.__check_dic(temp):
                                     print("Error with file: " + abs_path)
                                 else:
-                                    res.append(json.load(file))
+                                    res.append(temp)
             elif os.path.isfile(address):
                 if os.path.splitext(address)[1] == ".json":
                     with open(address) as file:
-                        if not self.__check_dic(json.load(file)):
+                        temp = json.load(file)
+                        if not self.__check_dic(temp):
                             print("Error with file: " + address)
                         else:
-                            res.append(json.load(file))
+                            res.append(temp)
+        return res
 
-    def get_data(self, data=None):
+    def __get_data(self, data=None, mode=0):
         """
         Check input data(list, dict, str) and create list of json dict
         If data is empty it will take plata_data from init
-        :return: list of json dict
+        Mode:
+        0 - data from self.plate_data
+        1 - data from self.zhgut_data
+        :return: list of json dict or dict(if mode == 1)
         """
         res = []
         if data is None:
-            data = self.plate_data
-        if type(data) == list:
+            if mode == 0:
+                data = self.plate_data
+            elif mode == 1:
+                data = self.zhgut_data
+        if type(data) == list and mode == 1:
             for item in data:
                 if type(item) == dict:
                     if self.__check_dic(item):
                         res.append(item)
                 if type(item) == str:
-                    self.__check_address(item)
+                    self.__check_address(item, single=True)
         elif type(data) == dict:
             if self.__check_dic(data):
                 res.append(data)
         elif type(data) == str:
-            res.append(self.__check_address(data))
+            res.append(self.__check_address(data, single=False if mode == 0 else True))
         else:
             self.error_code = -2
             print("False type of input")
+        if mode == 0:
+            return res
+        elif mode == 1:
+            return res
 
-        # if not self.folder_flag:
-        #     try:
-        #         checker.check_type(self.plate_data)
-        #         checker.check_version(self.plate_data)
-        #         checker.check_content(self.plate_data)
-        #     except self.JSONFormatException as e:
-        #         print(e)
-        #         self.error_code = -1
+    def get_plate_data(self, data=None):
+        """
+        Check data(address) and return list of correct dict
+        :param data: dict, str or list of them
+        :return: LIST of plate data
+        """
+        return self.__get_data(data)
 
-    def find_plate(self):
+    def get_zhgut_data(self, data=None):
+        """Check data(address) return res in the list. If it's not correct list will be empty
+        :param data: dict or str
+
+        """
+        return self.__get_data(data, mode=1)
+
 
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    test = Test_generator("F:\\Python projects\\Иванычев_sdfЛ1.json", "F:\\Python projects\\Иванычев_ИВТ-32_Л1.json")
-    test.check_data()
-    print()
+    test = JSON_parser("F:\\Python projects\\Иванычев_sdfЛ1.json", "F:\\Python projects\\Иванычев_ИВТ-32_Л1.json")
+    print(test.get_plate_data())
+    print(test.get_zhgut_data())
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
