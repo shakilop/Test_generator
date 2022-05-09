@@ -163,6 +163,11 @@ class Test_generator:
             else:
                 self.__gen_exception("No \"" + self.CONTENT_WORD + "\" field in json")
 
+        def check(self, data=None):
+            self.check_type(data)
+            self.check_version(data)
+            self.check_content(data)
+
     plate_data = None
     zhgut_data = None
     folder_flag = False
@@ -176,6 +181,8 @@ class Test_generator:
     def plate_init(self, plate):
         # На вход подали данные
         if type(plate) == dict:
+            self.plate_data = plate
+        elif type(plate) == list:
             self.plate_data = plate
         # На вход подали адресс
         elif type(plate) == str:
@@ -211,16 +218,73 @@ class Test_generator:
         else:
             raise self.FileTypeException("Garbage in zhgut input (not dict or str)")
 
-    def check_data(self):
-        checker = self.Data_checker(self.plate_data)
-        if not self.folder_flag:
-            try:
-                checker.check_type(self.plate_data)
-                checker.check_version(self.plate_data)
-                checker.check_content(self.plate_data)
-            except self.JSONFormatException as e:
-                print(e)
-                self.error_code = -1
+    def __check_dic(self,data=dict):
+        checker = self.Data_checker(data)
+        try:
+            checker.check()
+            return True
+        except self.JSONFormatException as e:
+            print(e)
+            self.error_code = -1
+            return False
+
+    def __check_address(self, address):
+        res = []
+        if type(address) == str:
+            if os.path.isdir(address):
+                for dr in os.listdir(address):
+                    abs_path = os.path.join(address, dr)
+                    if os.path.isfile(abs_path):
+                        if os.path.splitext(abs_path)[1] == ".json":
+                            with open(abs_path) as file:
+                                if not self.__check_dic(json.load(file)):
+                                    print("Error with file: " + abs_path)
+                                else:
+                                    res.append(json.load(file))
+            elif os.path.isfile(address):
+                if os.path.splitext(address)[1] == ".json":
+                    with open(address) as file:
+                        if not self.__check_dic(json.load(file)):
+                            print("Error with file: " + address)
+                        else:
+                            res.append(json.load(file))
+
+    def get_data(self, data=None):
+        """
+        Check input data(list, dict, str) and create list of json dict
+        If data is empty it will take plata_data from init
+        :return: list of json dict
+        """
+        res = []
+        if data is None:
+            data = self.plate_data
+        if type(data) == list:
+            for item in data:
+                if type(item) == dict:
+                    if self.__check_dic(item):
+                        res.append(item)
+                if type(item) == str:
+                    self.__check_address(item)
+        elif type(data) == dict:
+            if self.__check_dic(data):
+                res.append(data)
+        elif type(data) == str:
+            res.append(self.__check_address(data))
+        else:
+            self.error_code = -2
+            print("False type of input")
+
+        # if not self.folder_flag:
+        #     try:
+        #         checker.check_type(self.plate_data)
+        #         checker.check_version(self.plate_data)
+        #         checker.check_content(self.plate_data)
+        #     except self.JSONFormatException as e:
+        #         print(e)
+        #         self.error_code = -1
+
+    def find_plate(self):
+
 
 
 # Press the green button in the gutter to run the script.
